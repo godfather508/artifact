@@ -1,20 +1,29 @@
-# This is a basic workflow to help you get started with Actions
+name: New feature deploy testing on Develop Org
 
-name: Artifact
+on:
+  push:
+    branches: [ develop ]
 
-on: [push]
-
-env: 
-  ARTIFACT_NAME: myartifact
+jobs:
+  test:
   
-jobs: 
-  main: 
-    runs-on: Check out the code
+    runs-on: ubuntu-latest
+    
     steps:
-      - name: check out the code
-        uses: actions/checkout@v2.7.0
-      - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v3.1.2
+      - uses: sfdx-actions/setup-sfdx@v1
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: .
+          sfdx-auth-url: ${{ secrets.SFDX_AUTHEN_DEV_URL }}
+      - name: 'Installing SFDX scanner'
+        run: sfdx plugins:install @salesforce/sfdx-scanner
+      - name: 'Create delta packages for new, modified or deleted metadata'
+        run: | 
+          mkdir changed-sources
+          sfdx sgd:source:delta --to "HEAD" --from "HEAD^" --output changed-sources/ --generate-delta --source force-app/ 
+      - name: 'Scan code'
+        run: |
+          cd changed-sources
+          sfdx scanner:run --format sarif --target './**/*.cls' --category "Design,Best Practices,Performance" --outfile 'apexScanResults.sarif'  
+          cd ..
+      - name: 'Check-only deploy delta changes - run all tests'
+        run: |
+          sfdx force:source:deploy -p "changed-sources/force-app" --checkonly --testlevel RunLocalTests --json
