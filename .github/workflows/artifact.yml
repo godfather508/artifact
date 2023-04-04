@@ -2,7 +2,7 @@ name: New feature deploy testing on Develop Org
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ clickdeploy_783405 ]
 
 jobs:
   test:
